@@ -14,8 +14,8 @@ Unlike traditional USB hosts, this project introduces the **"SBU-Native"** stand
 ## 2. Key Features
 
 * **Dual-Path Architecture:**
-    * **Operation Path:** Raw UART via SBU pins $ightarrow$ SPI Bridge $ightarrow$ ESP32-C6 (Zero Latency).
-    * **Maintenance Path:** Standard USB D+/D- $ightarrow$ USB Hub $ightarrow$ PC (Pass-through for firmware updates).
+    * **Operation Path:** Raw UART via SBU pins -> SPI Bridge -> ESP32-C6 (Zero Latency).
+    * **Maintenance Path:** Standard USB D+/D- -> USB Hub -> PC (Pass-through for firmware updates).
 * **Matter & Thread Ready:** Powered by **ESP32-C6** (RISC-V) with native 802.15.4 radio.
 * **High-Performance I/O:** Dedicated **WIZnet W5500** Ethernet and **WK2124** SPI-to-Quad-UART bridge.
 * **Universal Compatibility:** Supports legacy 868MHz CUL sticks alongside modern Zigbee/Matter dongles.
@@ -28,30 +28,33 @@ The system is built around a split-bus topology:
 
 ```mermaid
 graph TD
-    subgraph "Host PC / Debugger"
+    subgraph Host_PC [Host PC / Debugger]
         PC[Computer USB-C]
     end
 
-    subgraph "bw-sbu-bridge PCB"
+    subgraph PCB [bw-sbu-bridge PCB]
         Hub[USB Hub FE1.1s]
         MCU[ESP32-C6]
         Eth[W5500 Ethernet]
         UART_Bridge[WK2124 SPI-UART]
+        Slot1[Stick Slot 1]
+        Slot2[Stick Slot 2]
+        Slot3[Stick Slot 3]
+        Slot4[Stick Slot 4]
         
-        % Connections
-        PC == USB 2.0 ==> Hub
-        Hub -. D+/D- Pass-through .-> Slot1[Stick Slot 1]
-        Hub -. D+/D- Pass-through .-> Slot2[Stick Slot 2]
-        Hub -. D+/D- Pass-through .-> Slot3[Stick Slot 3]
-        Hub -. D+/D- Pass-through .-> Slot4[Stick Slot 4]
+        PC == "USB 2.0" ==> Hub
+        Hub -. "D+/D- Pass-through" .-> Slot1
+        Hub -. "D+/D- Pass-through" .-> Slot2
+        Hub -. "D+/D- Pass-through" .-> Slot3
+        Hub -. "D+/D- Pass-through" .-> Slot4
 
-        MCU == SPI ==> Eth
-        MCU == SPI ==> UART_Bridge
+        MCU == "SPI" ==> Eth
+        MCU == "SPI" ==> UART_Bridge
         
-        UART_Bridge == UART/SBU ==> Slot1
-        UART_Bridge == UART/SBU ==> Slot2
-        UART_Bridge == UART/SBU ==> Slot3
-        UART_Bridge == UART/SBU ==> Slot4
+        UART_Bridge == "UART/SBU" ==> Slot1
+        UART_Bridge == "UART/SBU" ==> Slot2
+        UART_Bridge == "UART/SBU" ==> Slot3
+        UART_Bridge == "UART/SBU" ==> Slot4
     end
 ```
 
@@ -67,7 +70,7 @@ This project defines a custom usage of the USB-C Sideband pins to enable dual-mo
 | **A7 / B7** | **D-** | USB Data - | Connects to USB Hub (PC Link) |
 | **A8** | **SBU1** | **UART TX** | 1kΩ Series Resistor required |
 | **B8** | **SBU2** | **UART RX** | 1kΩ Series Resistor required |
-| **A4/B4/A9/B9** | **VBUS** | 5V Power | Bus Power |
+| **A4/B4** | **VBUS** | 5V Power | Bus Power |
 | **GND** | **GND** | Ground | Common Ground |
 
 > **Note:** The 1kΩ resistors on SBU lines are mandatory to protect the MCU if the stick is inserted into a non-compliant USB-C audio adapter.
