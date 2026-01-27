@@ -89,17 +89,14 @@ graph LR
         LDO[3.3V LDO Regulator]
     end
 
-    % Power Flow
     VBUS --> LDO
     GND --> LDO
     LDO --> PWR
     CC -- "GND" --> R_CC
 
-    % USB Data Flow (PC)
     DP === GPIO13
     DM === GPIO12
 
-    % SBU Data Flow (Gateway)
     GPIO16 -- "TX Signal" --> R_TX
     R_TX --> SBU1
     
