@@ -1,7 +1,7 @@
 # Busware "SBU-Native" Stick Design Guidelines
 
 **Target Platform:** ESP32-C6 (RISC-V)  
-**Version:** 1.0 (Draft)
+**Version:** 1.1 (Draft + Firmware Logic)
 
 ![Status](https://img.shields.io/badge/Compatibility-ESP32--C6-green) ![Standard](https://img.shields.io/badge/Standard-USB--C_SBU-blue)
 
@@ -113,11 +113,36 @@ graph LR
 3.  **SBU Routing:** Route SBU1/SBU2 as standard digital traces. No specific impedance matching required, but keep them short.
 4.  **Thermal:** The ESP32-C6 generates heat. Use the bottom layer as a solid Ground plane for heat dissipation.
 
-## 7. Firmware Requirements
+---
 
-To support Auto-Detection:
+## 7. Firmware & Dual-Path Strategy
 
-* **Boot Check:** The firmware should check if D+/D- are enumerated (USB VBUS present is not enough, as Gateway provides power too).
-* **Stream Mirroring:** Ideally, the firmware should mirror the data stream:
-    * `Radio Packet` -> `UART0` (SBU) **AND** `USB-CDC` (if connected).
-    * This allows simultaneous logging via USB while the Gateway operates via SBU.
+The ESP32-C6 features a built-in USB Serial/JTAG Controller. Unlike external USB chips, it enumerates automatically upon boot. To distinguish between a "Active Host" (PC/Debug) and a "Passive Power" (Gateway/Charger), firmware **MUST** check the Data Terminal Ready (DTR) state.
+
+### 7.1 Recommended Logic Flow
+
+1.  **UART0 (SBU):** Always Active. This is the primary payload channel for the **bw-sbu-bridge**.
+2.  **USB-Serial (D+/D-):** Conditional. Only send data if the Host has opened the port.
+
+### 7.2 Implementation Example (ESP-IDF)
+
+Use the native `usb_serial_jtag` driver to detect the DTR signal:
+
+```c
+#include "driver/usb_serial_jtag.h"
+
+void loop() {
+    // 1. Always handle SBU (UART0) Traffic
+    // Send radio packets to UART0 regardless of USB state
+    handle_gateway_communication();
+
+    // 2. Check for Active PC Connection (DTR High)
+    if (usb_serial_jtag_is_connected()) {
+        // The internal JTAG controller detects that a Host has opened the port.
+        // Mirror logs or data to USB for debugging.
+        printf("Stick Status: Active - PC Connected\n");
+    }
+}
+```
+
+> **Note:** Relying solely on VBUS voltage is **insufficient**, as the Gateway supplies 5V even when the USB data path is not being monitored.
