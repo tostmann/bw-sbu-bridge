@@ -2,6 +2,7 @@
 
 **The Ultimate ESP32-C6 IoT Gateway & USB-C SBU Breakout**
 
+![Status](https://img.shields.io/badge/Status-Hardware_Design-blue) ![License](https://img.shields.io/badge/License-MIT-green)
 
 ## 1. Overview
 
@@ -15,42 +16,70 @@ Unlike traditional USB hosts, this project introduces the **"SBU-Native"** stand
 
 * **Dual-Path Architecture:**
     * **Operation Path:** Raw UART via SBU pins -> SPI Bridge -> ESP32-C6 (Zero Latency).
-    * **Maintenance Path:** Standard USB D+/D- -> USB Hub -> PC (Pass-through for firmware updates).
-* **Matter & Thread Ready:** Powered by **ESP32-C6** (RISC-V) with native 802.15.4 radio.
-* **High-Performance I/O:** Dedicated **WIZnet W5500** Ethernet and **WK2124** SPI-to-Quad-UART bridge.
-* **Universal Compatibility:** Supports legacy 868MHz CUL sticks alongside modern Zigbee/Matter dongles.
+    * **Maintenance Path:** Standard USB D+/D- -> USB Hub -> PC (Access to all Sticks AND the Host C6).
+* **Triple-Radio Host:**
+    * **Matter / Thread:** Native 802.15.4 support via ESP32-C6.
+    * **Zigbee 3.0:** Can act as Coordinator or Router.
+    * **WiFi 6 (802.11ax):** Low-power, high-efficiency wireless uplink.
+* **Professional Connectivity:**
+    * Dedicated **WIZnet W5500** Ethernet Controller.
+    * **Power over Ethernet (PoE)** support (802.3af) for single-cable installation.
+* **High-Performance I/O:** **WK2124** SPI-to-Quad-UART bridge for reliable serial streams.
 
 ---
 
 ## 3. System Architecture
 
-The system is built around a split-bus topology:
+The system is built around a split-bus topology with 5 USB downstream ports (4x Sticks + 1x Host MCU) and a dedicated wireless frontend:
 
 ```mermaid
 graph TD
-    subgraph Host_PC [Host PC / Debugger]
-        PC[Computer USB-C]
+    subgraph External [External Connections]
+        PC["Computer USB-C"]
+        RJ45["LAN Switch / PoE"]
+        HomeNet[("Matter Fabric / WiFi / Zigbee Mesh")]
     end
 
     subgraph PCB [bw-sbu-bridge PCB]
-        Hub[USB Hub FE1.1s]
-        MCU[ESP32-C6]
-        Eth[W5500 Ethernet]
-        UART_Bridge[WK2124 SPI-UART]
-        Slot1[Stick Slot 1]
-        Slot2[Stick Slot 2]
-        Slot3[Stick Slot 3]
-        Slot4[Stick Slot 4]
+        Hub["USB Hub 5-Port"]
+        MCU["ESP32-C6"]
+        Eth["W5500 Ethernet"]
+        UART_Bridge["WK2124 SPI-UART"]
+        PoE_Power["PoE Power Extraction"]
         
-        PC == "USB 2.0" ==> Hub
-        Hub -. "D+/D- Pass-through" .-> Slot1
-        Hub -. "D+/D- Pass-through" .-> Slot2
-        Hub -. "D+/D- Pass-through" .-> Slot3
-        Hub -. "D+/D- Pass-through" .-> Slot4
+        % Wireless Section
+        Antenna(("2.4GHz Antenna"))
+        
+        subgraph Ports [Stick Ports]
+            Slot1["Stick Slot 1"]
+            Slot2["Stick Slot 2"]
+            Slot3["Stick Slot 3"]
+            Slot4["Stick Slot 4"]
+        end
+        
+        % USB Maintenance Path
+        PC == "USB 2.0 Uplink" ==> Hub
+        Hub -. "D+/D- (Port 5)" .-> MCU
+        Hub -. "D+/D- (Port 1)" .-> Slot1
+        Hub -. "D+/D- (Port 2)" .-> Slot2
+        Hub -. "D+/D- (Port 3)" .-> Slot3
+        Hub -. "D+/D- (Port 4)" .-> Slot4
 
+        % Ethernet & Power Path
+        RJ45 == "Data & Power" ==> PoE_Power
+        PoE_Power -- "5V DC" --> Hub
+        PoE_Power -- "5V DC" --> MCU
+        PoE_Power -- "Magnetics" --> Eth
+
+        % Internal Logic Path (SPI)
         MCU == "SPI" ==> Eth
         MCU == "SPI" ==> UART_Bridge
         
+        % Wireless Path
+        MCU -. "802.15.4 / WiFi 6" .- Antenna
+        Antenna -. "Matter / Zigbee / Thread" .-> HomeNet
+        
+        % SBU Operational Path
         UART_Bridge == "UART/SBU" ==> Slot1
         UART_Bridge == "UART/SBU" ==> Slot2
         UART_Bridge == "UART/SBU" ==> Slot3
@@ -84,8 +113,8 @@ This project defines a custom usage of the USB-C Sideband pins to enable dual-mo
 | **ESP32-C6-WROOM-1** | RISC-V MCU | Application Host / Matter Coordinator |
 | **WK2124** | SPI to 4x UART | High-speed Serial Bridge (256 Byte FIFO) |
 | **W5500** | SPI Ethernet | Hardwired Network Interface |
-| **FE1.1s** | USB 2.0 Hub | 4-Port USB Pass-through Controller |
-| **USB-C Receptacle** | 16-Pin / 24-Pin | High-quality connectors for sticks |
+| **FE1.1s / GL850G** | USB 2.0 Hub | 5-Port Configuration (or 4-Port + 1 Shared) |
+| **Ag9905 / Discrete** | PoE Module | 802.3af to 5V DC Converter |
 
 ## 6. Software Support
 
