@@ -46,8 +46,6 @@ graph TD
         Eth["W5500 Ethernet"]
         UART_Bridge["WK2124 SPI-UART"]
         PoE_Power["PoE Power Extraction"]
-        
-        % Wireless Section
         Antenna(("2.4GHz Antenna"))
         
         subgraph Ports [Stick Ports]
@@ -57,7 +55,6 @@ graph TD
             Slot4["Stick Slot 4"]
         end
         
-        % USB Maintenance Path
         PC == "USB 2.0 Uplink" ==> Hub
         Hub -. "D+/D- (Port 5)" .-> MCU
         Hub -. "D+/D- (Port 1)" .-> Slot1
@@ -65,21 +62,17 @@ graph TD
         Hub -. "D+/D- (Port 3)" .-> Slot3
         Hub -. "D+/D- (Port 4)" .-> Slot4
 
-        % Ethernet & Power Path
         RJ45 == "Data & Power" ==> PoE_Power
         PoE_Power -- "5V DC" --> Hub
         PoE_Power -- "5V DC" --> MCU
         PoE_Power -- "Magnetics" --> Eth
 
-        % Internal Logic Path (SPI)
         MCU == "SPI" ==> Eth
         MCU == "SPI" ==> UART_Bridge
         
-        % Wireless Path
         MCU -. "802.15.4 / WiFi 6" .- Antenna
         Antenna -. "Matter / Zigbee / Thread" .-> HomeNet
         
-        % SBU Operational Path
         UART_Bridge == "UART/SBU" ==> Slot1
         UART_Bridge == "UART/SBU" ==> Slot2
         UART_Bridge == "UART/SBU" ==> Slot3
