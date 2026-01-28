@@ -2,7 +2,7 @@
 
 **Module:** Espressif ESP32-C6-MINI-1 (PCB Antenna) / -1U (U.FL)
 **Application:** Dual-Path RF Stick (USB & SBU)
-**Revision:** v6 (Complete Feature Set)
+**Revision:** v6 (Final - Cleaned)
 
 ![Status](https://img.shields.io/badge/Status-FINAL_DESIGN-green)
 
@@ -71,8 +71,6 @@ graph LR
         P17["Pad 17 (RX)"]
         P09["Pad 9 (BOOT)"]
         EN["Pad 3 (EN/RST)"]
-        
-        % Transceiver Pins
         P04["Pad 4 (CS/TX)"]
         P05["Pad 5 (IRQ/RX)"]
         P06["Pad 6 (SCK/SET)"]
@@ -93,22 +91,16 @@ graph LR
         R2["1k Ohm"]
     end
 
-    % USB Path
     USB_DP === P13
     USB_DM === P12
 
-    % SBU Path
     P16 -- "TX" --> R1 --> SBU_TX_Pin
     SBU_RX_Pin --> R2 --> P17
 
-    % THE TRICK: Auto-Boot via SBU_RX
-    % Connecting Stick RX (P17) to Boot (P09)
     P17 -- "Auto-Boot Link" --> R_AUTO --> P09
 
-    % Manual Boot Button
     P09 -- "Pull Low" --> BTN --> GND
     
-    % Power-On Reset Delay
     VBUS --> RC_R --> EN
     EN --> RC_C --> GND
 ```
