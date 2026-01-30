@@ -1,67 +1,150 @@
-# Hardware Design Specification: Hybrid CUL-SBU Stick (ATmega32u4)
+# Hardware Design Specification: Busware CUL-SBU Hybrid (ATmega32u4)
 
 ## 1. Abstract
-This design enables "Dual-Path" functionality on ATmega32u4-based RF sticks (CUL). It ensures 100% backward compatibility with legacy firmware (culfw) while supporting the new "SBU-Native" UART standard for next-gen gateways.
+This design defines the "Dual-Path" architecture for ATmega32u4-based CUL sticks. It combines 100%% Legacy Compatibility (culfw) with the new "SBU-Native" UART Interface, selectable via software.
 
-## 2. Core Architecture
+## 2. Pin Mapping Strategy
 
-### The Problem
-* **Legacy FW** expects CC1101 GDO signals on **PD2/PD3** (Hardware INT2/INT3).
-* **SBU-Native FW** requires **PD2/PD3** for Hardware UART (Serial1).
+### The "Conflict"
+Legacy firmware expects Radio Signals (GDO0/GDO2) on **PD3/PD2**. SBU-Native firmware needs **PD3/PD2** for Hardware UART (`Serial1`).
 
-### The Solution: "Switched & Mirrored" Topology
-We use a **Dual SPDT Analog Switch** (Multiplexer) to toggle PD2/PD3, while simultaneously mirroring the radio signals to backup pins (PB4/PB5) for the new firmware.
-
----
-
-## 3. Circuit Logic & Schematic
-
-### A. Multiplexer Configuration
-* **Component:** TS5A23157 (or equivalent Dual SPDT)
-* **Control Signal:** **PD4** (or any free GPIO)
-* **State Requirement:** Must have a **10k Pull-Down Resistor** to GND (Default = LOW = Legacy).
-
-| Switch Pin | Connected To | Function |
-| :--- | :--- | :--- |
-| **IN (Select)** | **ATmega PD4** | **LOW** = Legacy (Radio), **HIGH** = SBU (UART) |
-| **COM1** | **ATmega PD3** | Shared Pin (TX / INT3) |
-| **NC1** (Default) | **CC1101 GDO0** | Radio Interrupt (Legacy Path) |
-| **NO1** (Active) | **USB-C A8** | SBU1 UART TX (via 1k Resistor) |
-| **COM2** | **ATmega PD2** | Shared Pin (RX / INT2) |
-| **NC2** (Default) | **CC1101 GDO2** | Radio Interrupt (Legacy Path) |
-| **NO2** (Active) | **USB-C B8** | SBU2 UART RX (via 1k Resistor) |
-
-### B. The "Permanent" Radio Link
-To allow the SBU-Native firmware to receive radio packets while PD2/PD3 are busy with UART, the GDO lines must be physically forked (Y-connection).
-
-* **CC1101 GDO0** --> also connected to **ATmega PB4** (PCINT4)
-* **CC1101 GDO2** --> also connected to **ATmega PB5** (PCINT5)
+### The Solution
+We use a Multiplexer to toggle PD2/PD3 and provide a permanent backup path for Radio Signals on **PD0/PD1** (INT0/INT1).
 
 ---
 
-## 4. Connector Pinout (USB-C Male)
+## 3. Signal Connections
 
-| USB Pin | Signal | Connection Requirement |
-| :--- | :--- | :--- |
-| **A6, B6** | **D+** | Direct to ATmega D+ |
-| **A7, B7** | **D-** | Direct to ATmega D- |
-| **A8** | **SBU1** | To Mux **NO1** via **1kΩ Series Resistor** |
-| **B8** | **SBU2** | To Mux **NO2** via **1kΩ Series Resistor** |
-| **CC1** | **CC** | **5.1kΩ Pull-Down** to GND |
-| **CC2** | **CC** | **5.1kΩ Pull-Down** to GND |
-| **A4, B4** | **VBUS** | 5V Input (Fuse recommended) |
+### A. Radio Interface (CC1101)
+Redundant wiring ensures radio access in both modes.
+
+| Signal | Legacy Pin | New "Permanent" Pin | Note |
+| :--- | :--- | :--- | :--- |
+| **GDO0** | **PD3** (via Switch NC) | **PD1** (INT1) | Interrupt Vector INT1 |
+| **GDO2** | **PD2** (via Switch NC) | **PD0** (INT0) | Interrupt Vector INT0 |
+
+### B. Multiplexer Control (TS5A23157)
+Controlled by **PD4**. Includes fail-safe for legacy FW.
+
+* **Select Pin:** **PD4** (Output)
+* **Fail-Safe:** **10kΩ Pull-Down** Resistor to GND (Default = LOW).
+
+| Mux State | Select (PD4) | PD2/PD3 Function | Note |
+| :--- | :--- | :--- | :--- |
+| **Legacy** | **LOW** | Connected to **GDO2/GDO0** | Standard CULFW behavior |
+| **SBU-Native** | **HIGH** | Connected to **SBU RX/TX** | UART Mode active |
+
+### C. USB-C SBU Interface (UART)
+Connecting the ATmega Hardware UART to the USB-C Sideband pins.
+
+| Signal | ATmega Pin | Mux Input | USB-C Pin | Protection |
+| :--- | :--- | :--- | :--- | :--- |
+| **TX** | PD3 | NO1 | **A8 (SBU1)** | **1kΩ Series Resistor** |
+| **RX** | PD2 | NO2 | **B8 (SBU2)** | **1kΩ Series Resistor** |
+
+### D. Hardware Revision Detect
+Allows firmware to auto-detect if it is running on SBU-capable hardware.
+
+* **Pin:** **PB4**
+* **Circuit:** **10kΩ Resistor to GND**.
+* **Detection Logic:**
+    1. Set PB4 to `INPUT_PULLUP`.
+    2. Read PB4.
+    3. **LOW** = New Hardware (Resistor beats internal pull-up).
+    4. **HIGH** = Old Hardware (Internal pull-up wins).
 
 ---
 
-## 5. Firmware Operations
+## 4. Operational Logic
 
-### Mode 1: Legacy (Standard culfw)
-* **GPIO State:** PD4 is Input/Low (held by Pull-Down).
-* **Mux State:** NC connected to COM.
-* **Behavior:** ATmega sees Radio on PD2/PD3. USB-CDC used for communication.
+### 1. Boot / Legacy Mode
+* **PD4** is Low (Pull-Down). Switch routes GDOs to PD2/PD3.
+* **PB4** Check: Firmware detects HIGH (Old HW) or LOW (New HW).
+* Legacy FW works out-of-the-box (uses PD2/PD3 for Radio).
 
-### Mode 2: SBU-Native (NextGen FW)
-* **GPIO State:** Firmware sets PD4 to **HIGH**.
-* **Mux State:** NO connected to COM.
-* **UART:**  active on PD2/PD3 (communicating via SBU pins).
-* **Radio:** Firmware ignores INT2/INT3. Instead, it enables **PCINT on PB4/PB5** to read GDO signals.
+### 2. SBU Mode (New Firmware)
+1. **Check PB4:** If LOW, we are on SBU Hardware.
+2. **Switch Mux:** Set **PD4 = HIGH**.
+3. **Init UART:** Start `Serial1` on PD2/PD3.
+4. **Init Radio:** Use **PD1 (INT1)** and **PD0 (INT0)** for GDO interrupts instead of PD3/PD2.
+
+---
+
+## 5. Wiring Diagram (Schematic View)
+
+```mermaid
+graph LR
+    subgraph USB_C [USB-C Connector]
+        direction TB
+        SBU1["A8 (SBU1)"]
+        SBU2["B8 (SBU2)"]
+        DP["D+ (A6/B6)"]
+        DM["D- (A7/B7)"]
+    end
+
+    subgraph Protection
+        R_TX["1kΩ"]
+        R_RX["1kΩ"]
+    end
+
+    subgraph MUX [TS5A23157 Multiplexer]
+        direction TB
+        subgraph CH1 [Channel 1]
+            NO1
+            NC1
+            COM1
+        end
+        subgraph CH2 [Channel 2]
+            NO2
+            NC2
+            COM2
+        end
+        IN["IN (Select)"]
+    end
+
+    subgraph MCU [ATmega32u4]
+        direction TB
+        PD3["PD3 (TX / INT3)"]
+        PD2["PD2 (RX / INT2)"]
+        PD1["PD1 (INT1)"]
+        PD0["PD0 (INT0)"]
+        PD4["PD4 (Mux Ctrl)"]
+        PB4["PB4 (Detect)"]
+        USB_DP["D+"]
+        USB_DM["D-"]
+    end
+
+    subgraph RADIO [CC1101]
+        GDO0
+        GDO2
+    end
+
+    %% USB Data
+    DP --- USB_DP
+    DM --- USB_DM
+
+    %% SBU / UART Path (Active High)
+    SBU1 --- R_TX --> NO1
+    SBU2 --- R_RX --> NO2
+    NO1 -.-> COM1
+    NO2 -.-> COM2
+
+    %% Legacy Radio Path (Default Low)
+    GDO0 --- NC1
+    GDO2 --- NC2
+    NC1 === COM1
+    NC2 === COM2
+
+    %% MCU Connections
+    COM1 --- PD3
+    COM2 --- PD2
+
+    %% Permanent Radio Path (Redundancy)
+    GDO0 --- PD1
+    GDO2 --- PD0
+
+    %% Control & Detect
+    PD4 --> IN
+    PB4 -- "10k" --> GND((GND))
+    IN -- "10k" --> GND((GND))
+```
