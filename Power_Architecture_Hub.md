@@ -1,7 +1,7 @@
 # Power Architecture: Industrial 4-Port RF Hub
 **Application:** High-Stability USB Hub for ESP32/EnOcean Sticks
 **Target Host:** Raspberry Pi / Industrial PC
-**Version:** v1.0
+**Version:** v1.1 (Extended with EMC/ESD Protection)
 
 ---
 
@@ -43,7 +43,8 @@ How the hub reacts to different power sources connected by the user:
 *The user connects a modern USB-C charger or a PD power bank to Port B.*
 
 * **Process:** CH224K negotiates 9V. Buck converter regulates to a stable **5.3V**.
-* **Logic:** * Voltage PSU path (after diode): `5.3V - 0.3V = 5.0V`
+* **Logic:**
+    * Voltage PSU path (after diode): `5.3V - 0.3V = 5.0V`
     * Voltage PC path (after diode): `5.0V - 0.3V = 4.7V`
 * **Result:** The diode towards the PC **reverse-biases (blocks)**. 100% of the current is drawn from the external PSU. The PC port is not loaded.
 * **Status:** ✅ **Perfect.** Maximum power (3A+), cleanest voltage.
@@ -106,3 +107,47 @@ graph LR
     end
 
     style Note1 fill:#ff9,stroke:#333,stroke-width:2px
+```
+
+## 5. BOM Recommendation (Critical Parts)
+
+| Section | Component | Value/Type | Reason |
+| :--- | :--- | :--- | :--- |
+| **PD Logic** | WCH **CH224K** | Config: R for 9V | Simplest PD sink controller, SOT23-6. |
+| **DC/DC** | MPS **MP2315** | Vout: **5.3V** | **Synchronous** rectification (crucial for 5V fallback). 3A output. |
+| **Protection** | Diode | **SS34** (SMA) | Schottky, Low Drop (0.3V), 3A rating. |
+| **Connector** | USB-C | 16-Pin | Port B requires CC1/CC2 pins for PD detection. |
+
+---
+
+## 6. Protection & EMC Strategy (Industrial Grade)
+
+To move from a hobbyist prototype to a reliable industrial device, the following protection measures are mandatory for the Uplink and recommended for Downlinks.
+
+### 6.1 ESD Protection (Electrostatic Discharge)
+The hub must withstand static shocks from user interaction (plugging/unplugging).
+
+* **For Data Lines (D+/D-):**
+    * **Requirement:** Ultra-low capacitance (< 1pF) to preserve signal integrity (480 Mbps).
+    * **Part:** **ST USBLC6-2** (SOT-23-6). One IC per USB port.
+    * **Placement:** Place immediately behind the USB connector pins.
+* **For Power Input (Port B):**
+    * **Requirement:** High surge capability.
+    * **Part:** TVS Diode **SMAJ15A** (Unidirectional). Protects against voltage spikes > 15V.
+    * **Placement:** Parallel to GND, directly after the Port B connector.
+
+### 6.2 EMC Filtering (Common Mode Chokes)
+Required to suppress RF noise from the USB High-Speed bus (480 MHz harmonics) and prevent the USB cable from acting as an antenna.
+
+* **Uplink (to PC):** **Mandatory.** The long cable is a major noise source.
+    * **Part:** Murata **DLW21SN900HQ2** or TDK **ACM2012-900** (0805 size).
+    * **Spec:** 90 Ohm impedance @ 100 MHz.
+* **Downlinks (to Sticks):** **Optional.** If sticks are plugged directly into the housing, chokes can be omitted. If cables are used, populate them.
+
+### 6.3 Reverse Polarity Protection
+Ensures the device does not smoke if a user forces a wrong power supply adapter.
+
+* **Implementation:** The **SS34 Schottky Diode** in the power path (see Section 2.2) inherently acts as a reverse polarity blocker.
+    * If $V_{in}$ is negative, the diode blocks. Current = 0A.
+* **Critical Design Note:** The input capacitor **before** the SS34 diode must be a **Ceramic Capacitor (MLCC)** (e.g., 10µF 25V X7R).
+    * *Reason:* Ceramic caps are non-polarized and survive negative voltage. Aluminum Electrolytic or Tantalum caps would explode if reverse-biased before the diode can block.
