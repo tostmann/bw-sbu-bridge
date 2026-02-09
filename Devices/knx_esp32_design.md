@@ -93,3 +93,21 @@ Die Verbindung zwischen NCN5130 `Pin VFILT` und dem positiven Pol der Polymer-El
 ### C. Priorisierung
 * **Szenario 1 (Nur KNX):** Versorgung rein über DC1 + Tank.
 * **Szenario 2 (USB gesteckt):** Da USB eine "harte" Spannungsquelle ist und der NCN strombegrenzt ist, übernimmt der LDO automatisch die Hauptlast. Das schont den Bus während Entwicklungsarbeiten.
+
+### D. USB-C Interface (D+/D- & CC)
+Damit der ESP32-C6 korrekt via USB kommuniziert und vom Host Strom erhält, ist folgende Beschaltung nötig:
+
+1.  **CC1 & CC2 (Power Negotiation):**
+    * Beide Pins müssen separat über je einen **5.1 kΩ Widerstand** gegen GND gezogen werden.
+    * *Funktion:* Dies signalisiert dem USB-C Host (z.B. Laptop), dass ein "Device" angeschlossen ist und aktiviert die 5V VBUS Spannung. Ohne diese Widerstände liefert ein reines USB-C Netzteil keine Spannung!
+
+2.  **D+ & D- (Datenleitungen):**
+    * Der ESP32-C6 hat einen internen USB-PHY.
+    * **Mapping:** D- an GPIO 12, D+ an GPIO 13.
+    * **0 Ω Series Resistors:** Es wird dringend empfohlen, **0 Ω Widerstände** (Brücken) in die D+ und D- Leitungen einzufügen (nahe am ESP32).
+    * *Grund:* Dies erlaubt es, im reinen KNX-Betrieb die USB-Leitungen physikalisch aufzutrennen, falls HF-Störungen auftreten oder man die GPIOs anderweitig debuggen muss, ohne die Leiterbahn aufzukratzen.
+
+3.  **ESD-Schutz:**
+    * Optional: Ein SR05 oder USBLC6-2 Baustein an D+/D- und VBUS schützt den ESP32 vor statischen Entladungen beim Einstecken.
+                                                                                                                                                                                                      88,1          Bot
+
