@@ -53,7 +53,7 @@ $$\Delta U \approx \frac{E_{Burst}}{C \times U} = \frac{0.0017}{0.000540 \times 
 
 ## 5. Schaltplan-Architektur
 
-~~mermaid
+~~~mermaid
 graph TD
     KNX[KNX Bus 29V] ==>|I_lim 40mA| NCN[NCN5130 Transceiver]
     NCN -- "VFILT 28V (High Energy)" --> TANK["Tank: 2x 270µF Polymer"]
@@ -73,7 +73,7 @@ graph TD
     
     NOTE[Symmetrie: Beide Quellen liefern stabil 3.3V]
     style NOTE fill:#fff5ad,stroke:#d4b400,color:black
-~~
+~~~
 
 ## 6. Implementation Details
 
