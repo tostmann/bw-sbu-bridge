@@ -104,10 +104,12 @@ Damit der ESP32-C6 korrekt via USB kommuniziert und vom Host Strom erhält, ist 
 2.  **D+ & D- (Datenleitungen):**
     * Der ESP32-C6 hat einen internen USB-PHY.
     * **Mapping:** D- an GPIO 12, D+ an GPIO 13.
-    * **0 Ω Series Resistors:** Es wird dringend empfohlen, **0 Ω Widerstände** (Brücken) in die D+ und D- Leitungen einzufügen (nahe am ESP32).
-    * *Grund:* Dies erlaubt es, im reinen KNX-Betrieb die USB-Leitungen physikalisch aufzutrennen, falls HF-Störungen auftreten oder man die GPIOs anderweitig debuggen muss, ohne die Leiterbahn aufzukratzen.
+    * Fügen Sie in die Leitungen D+ und D- (zwischen USB-Buchse und ESP32) je einen Widerstand von **470 Ω** ein.
+    * *Funktion:* Dies begrenzt den Fehlstrom auf ein unkritisches Niveau (< 10 mA), ohne die USB Full-Speed Kommunikation (12 Mbps) zu stören.
 
 3.  **ESD-Schutz:**
     * Optional: Ein SR05 oder USBLC6-2 Baustein an D+/D- und VBUS schützt den ESP32 vor statischen Entladungen beim Einstecken.
                                                                                                                                                                                                       88,1          Bot
-
+4.  **Gleichtaktdrossel (Empfohlen für CE):**
+    * Ein Footprint für eine Common Mode Choke (z.B. **Würth WE-CNSW**) sollte in den D+/D- Leitungen vorgesehen werden.
+    * *Initial:* Kann mit 0 Ω Brücken bestückt werden, ist aber der "Lebensretter" bei EMV-Tests.
